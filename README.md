@@ -27,7 +27,7 @@ Power Partner is a WordPress plugin that lets you **sell WordPress website templ
 | WordPress | 5.7 |
 | WooCommerce | 7.6.0 |
 | Woo Subscriptions | 5.9.0 |
-| Powerhouse (j7-dev) | 3.3.23 |
+| Powerhouse (p9-cloud) | 3.3.23 |
 
 ---
 
