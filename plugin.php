@@ -62,7 +62,7 @@ final class Plugin {
 			[
 				'name'     => 'Powerhouse',
 				'slug'     => 'powerhouse',
-				'source'   => 'https://github.com/p9-cloud/wp-powerhouse/releases/latest/download/powerhouse.zip',
+				'source'   => 'https://github.com/zenbuapps/wp-powerhouse/releases/latest/download/powerhouse.zip',
 				'version'  => '3.3.23',
 				'required' => true,
 			],
@@ -84,7 +84,7 @@ final class Plugin {
 		$this->init(
 			[
 				'app_name'         => 'Power Partner',
-				'github_repo'      => 'https://github.com/p9-cloud/wp-power-partner',
+				'github_repo'      => 'https://github.com/zenbuapps/wp-power-partner',
 				'callback'         => [ Bootstrap::class, 'instance' ],
 				'lc'               => false,
 				'submenu_callback' => [ Admin\Menu\Setting::class, 'render_page' ],
