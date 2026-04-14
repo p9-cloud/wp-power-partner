@@ -5,6 +5,7 @@ import { currentUserId } from '@/utils'
 import { DataType, TParams } from '@/components/LicenseCodes/types'
 import { LicenseCodes } from '@/components'
 import { useTable } from '@/hooks'
+import ContentCard from '@/components/ContentCard'
 
 const index = () => {
 	const identity = useAtomValue(identityAtom)
@@ -35,7 +36,11 @@ const index = () => {
 		}
 	}, [tableProps?.loading])
 
-	return <LicenseCodes tableProps={tableProps} setSearch={setSearch} isAdmin />
+	return (
+		<ContentCard>
+			<LicenseCodes tableProps={tableProps} setSearch={setSearch} isAdmin />
+		</ContentCard>
+	)
 }
 
 export default index

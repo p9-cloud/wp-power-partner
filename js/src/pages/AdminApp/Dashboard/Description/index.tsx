@@ -1,11 +1,13 @@
 import { Typography, Alert, Image } from 'antd'
 import preview from '@/assets/images/preview.jpg'
+import ContentCard from '@/components/ContentCard'
 
 const SHORT_CODE = '[power_partner_current_user_site_list]'
 const { Text } = Typography
 
 const index = () => {
 	return (
+		<ContentCard>
 		<div className="grid grid-cols-2 gap-8">
 			<div>
 				<Alert
@@ -37,6 +39,7 @@ const index = () => {
 				/>
 			</div>
 		</div>
+		</ContentCard>
 	)
 }
 

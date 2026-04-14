@@ -3,6 +3,7 @@ import {
 	GlobalOutlined,
 	LoadingOutlined,
 } from '@ant-design/icons'
+import ContentCard from '@/components/ContentCard'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import {
 	Button,
@@ -665,7 +666,11 @@ const siteTypeItems: TabsProps['items'] = [
 ]
 
 const index = () => {
-	return <Tabs items={siteTypeItems} />
+	return (
+		<ContentCard>
+			<Tabs items={siteTypeItems} />
+		</ContentCard>
+	)
 }
 
 export default index

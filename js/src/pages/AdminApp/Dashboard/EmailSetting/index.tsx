@@ -28,6 +28,7 @@ import { useAtom, useAtomValue } from 'jotai'
 import useGetEmails from '@/pages/AdminApp/Dashboard/EmailSetting/hooks/useGetEmails'
 import { PlusCircleOutlined } from '@ant-design/icons'
 import { useRef, useMemo } from 'react'
+import ContentCard from '@/components/ContentCard'
 
 const { Item } = Form
 
@@ -99,8 +100,9 @@ const EmailSetting = () => {
 	)
 
 	return (
-		<div ref={containerRef}>
-			{contextHolder}
+		<ContentCard>
+			<div ref={containerRef}>
+				{contextHolder}
 			<div className="flex flex-col lg:flex-row gap-8 relative">
 				<div className="flex-1">
 					<Button
@@ -155,6 +157,7 @@ const EmailSetting = () => {
 				</div>
 			</div>
 		</div>
+		</ContentCard>
 	)
 }
 
