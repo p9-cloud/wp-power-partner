@@ -46,7 +46,6 @@ import ContentCard from '@/components/ContentCard'
 import { globalLoadingAtom, identityAtom } from '@/pages/AdminApp/Atom/atom'
 import WebsiteActionButtons from './WebsiteActionButtons'
 import WebsiteListFilter, {
-	defaultFilters,
 	WebsiteFilters,
 } from './WebsiteListFilter'
 import type { IWebsite, IWebsiteResponse } from './types'
@@ -257,7 +256,6 @@ const PowercloudContent = () => {
 	const websiteIds = websites.map((w: IWebsite) => w.id)
 	const {
 		subscriptionMap,
-		isFetching: isAppsFetching,
 		refetch: refetchApps,
 	} = useSubscriptionApps({ websiteIds })
 

@@ -5,7 +5,6 @@ import {
 	Select,
 	Space,
 	Tag,
-	Typography,
 	message,
 } from 'antd'
 import { LinkOutlined, DisconnectOutlined } from '@ant-design/icons'
@@ -17,8 +16,6 @@ import {
 } from '@/components/SubscriptionSelect'
 import { debounce } from 'lodash-es'
 import type { AxiosResponse } from 'axios'
-
-const { Text } = Typography
 
 type TCustomer = {
 	id: string
