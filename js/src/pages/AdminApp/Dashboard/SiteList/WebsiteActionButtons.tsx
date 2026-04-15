@@ -2,12 +2,13 @@ import {
 	DeleteOutlined,
 	EllipsisOutlined,
 	GlobalOutlined,
+	PlayCircleOutlined,
 	SettingOutlined,
 	StopOutlined,
-	SyncOutlined,
 } from '@ant-design/icons'
 import { Button, Dropdown, Modal, Popconfirm, Tooltip } from 'antd'
 import type { MenuProps } from 'antd'
+import { Link } from 'react-router-dom'
 import type { IWebsite } from './types'
 
 interface WebsiteActionButtonsProps {
@@ -100,9 +101,15 @@ const WebsiteActionButtons = ({
 				rel="noreferrer"
 			>
 				<Tooltip title="前往 WordPress 後台">
-					<Button icon={<SettingOutlined />} size="small" type="text" />
+					<Button icon={<GlobalOutlined />} size="small" type="text" />
 				</Tooltip>
 			</a>
+
+			<Link to={`/websites/edit/${record.id}`}>
+				<Tooltip title="編輯">
+					<Button icon={<SettingOutlined />} size="small" type="text" />
+				</Tooltip>
+			</Link>
 
 			{isRunning && (
 				<Popconfirm
@@ -133,7 +140,7 @@ const WebsiteActionButtons = ({
 					cancelText="取消"
 				>
 					<Tooltip title="啟動站台">
-						<Button icon={<SyncOutlined />} size="small" type="text" />
+						<Button icon={<PlayCircleOutlined />} size="small" type="text" />
 					</Tooltip>
 				</Popconfirm>
 			)}
