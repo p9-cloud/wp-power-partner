@@ -15,11 +15,11 @@ const WebsiteEditor = () => {
 	const { data, isLoading } = useQuery({
 		queryKey: ['powercloud-website', id],
 		queryFn: () =>
-			powerCloudInstance.get<{ data: IWebsite }>(`/websites/${id}`),
+			powerCloudInstance.get<IWebsite>(`/websites/${id}`),
 		enabled: !!id,
 	})
 
-	const websiteData = data?.data?.data
+	const websiteData = data?.data
 
 	return (
 		<div className="space-y-4">
