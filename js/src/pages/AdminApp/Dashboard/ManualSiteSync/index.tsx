@@ -67,6 +67,14 @@ interface IPowercloudPackage {
 	updatedAt: string
 }
 
+interface IPowercloudTemplate {
+	id: string
+	primaryDomain: string
+	domain?: string
+	subDomain?: string
+	wildcardDomain: string
+}
+
 // 選中的方案 Atom
 const selectedPackageIdAtom = atom<string | null>(null)
 
@@ -221,6 +229,7 @@ type TPowercloudOpenSiteParams = {
 		}
 	}
 	ip?: string
+	templateUrl?: string
 }
 
 const PowercloudOpenSite = () => {
@@ -243,6 +252,22 @@ const PowercloudOpenSite = () => {
 
 	const websitePackages: IPowercloudPackage[] =
 		(packagesData?.data?.data as IPowercloudPackage[]) || []
+
+	// 取得模板列表
+	const { data: templatesData, isLoading: isLoadingTemplates } = useQuery({
+		queryKey: ['powercloud-template-list'],
+		queryFn: () =>
+			powerCloudInstance.get('/templates/wordpress?page=1&limit=250'),
+	})
+
+	const websiteTemplates: IPowercloudTemplate[] =
+		(templatesData?.data?.data as IPowercloudTemplate[]) || []
+
+	const getTemplateDomain = (template: IPowercloudTemplate): string =>
+		template.primaryDomain ||
+		template.domain ||
+		template.subDomain ||
+		template.wildcardDomain
 
 	// 當選中的方案改變時，自動設置表單值
 	useEffect(() => {
@@ -323,7 +348,15 @@ const PowercloudOpenSite = () => {
 				// 生成隨機配置（只調用一次）
 				const wpsiteConfig = generateRandomWpsiteProConfig()
 
-				const { adminEmail, ...data } = values
+				const { adminEmail, templateId, ...data } = values
+
+				// 解析模板 URL
+				const selectedTemplate = templateId
+					? websiteTemplates.find((tpl) => tpl.id === templateId)
+					: undefined
+				const templateUrl = selectedTemplate
+					? getTemplateDomain(selectedTemplate)
+					: undefined
 
 				createWordPress({
 					...data,
@@ -343,6 +376,7 @@ const PowercloudOpenSite = () => {
 							password: handleGenerateRandomPassword('mysql'),
 						},
 					},
+					...(templateUrl ? { templateUrl } : {}),
 				})
 			})
 			.catch((error) => {
@@ -372,6 +406,30 @@ const PowercloudOpenSite = () => {
 							label: `${pkg.name} - NT$ ${pkg.price}`,
 							value: pkg.id,
 						}))}
+						disabled={isPending}
+						getPopupContainer={() => containerRef.current as HTMLElement}
+					/>
+				</Form.Item>
+
+				<Form.Item
+					label="網站模板"
+					name={['templateId']}
+					help="選擇一個模板來創建網站"
+				>
+					<Select
+						placeholder="請選擇網站模板"
+						loading={isLoadingTemplates}
+						options={websiteTemplates.map((tpl) => ({
+							label: getTemplateDomain(tpl),
+							value: tpl.id,
+						}))}
+						allowClear
+						showSearch
+						filterOption={(input, option) =>
+							(option?.label as string)
+								?.toLowerCase()
+								.includes(input.toLowerCase()) ?? false
+						}
 						disabled={isPending}
 						getPopupContainer={() => containerRef.current as HTMLElement}
 					/>
