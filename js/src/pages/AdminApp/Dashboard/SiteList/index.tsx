@@ -3,6 +3,7 @@ import {
 	CopyOutlined,
 	GlobalOutlined,
 	LinkOutlined,
+	PlusOutlined,
 	ReloadOutlined,
 	SyncOutlined,
 } from '@ant-design/icons'
@@ -154,6 +155,7 @@ const getDomain = (website: IWebsite): string => {
 }
 
 const PowercloudContent = () => {
+	const setTab = useSetAtom(setTabAtom)
 	const powerCloudInstance = usePowerCloudAxiosWithApiKey(powerCloudAxios)
 	const [pagination, setPagination] = useState({ page: 1, limit: 10 })
 	const [searchFilters, setSearchFilters] = useState<WebsiteFilters | null>(
@@ -488,6 +490,15 @@ const PowercloudContent = () => {
 
 	return (
 		<div className="space-y-4">
+			<div className="flex justify-end">
+				<Button
+					type="primary"
+					icon={<PlusOutlined />}
+					onClick={() => setTab(TabKeyEnum.MANUAL_SITE_SYNC)}
+				>
+					新增網站
+				</Button>
+			</div>
 			<ContentCard>
 				<WebsiteListFilter onSearch={handleSearch} />
 			</ContentCard>
