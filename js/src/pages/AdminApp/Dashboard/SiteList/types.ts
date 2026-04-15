@@ -53,3 +53,7 @@ export interface IWebsiteResponse {
 	data: IWebsite[]
 	total: number
 }
+
+export type IWebsiteWithSubscription = IWebsite & {
+	subscriptionIds?: string[]
+}
