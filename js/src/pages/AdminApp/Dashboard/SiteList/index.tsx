@@ -431,6 +431,16 @@ const PowercloudContent = () => {
 			},
 		},
 		{
+			title: '備註',
+			dataIndex: 'memo',
+			key: 'memo',
+			width: 150,
+			ellipsis: true,
+			render: (memo?: string) => (
+				<Text ellipsis={{ tooltip: memo }}>{memo || '-'}</Text>
+			),
+		},
+		{
 			title: '建立時間',
 			dataIndex: 'createdAt',
 			key: 'createdAt',
