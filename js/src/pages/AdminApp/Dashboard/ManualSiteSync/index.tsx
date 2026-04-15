@@ -263,11 +263,12 @@ const PowercloudOpenSite = () => {
 	const websiteTemplates: IPowercloudTemplate[] =
 		(templatesData?.data?.data as IPowercloudTemplate[]) || []
 
-	const getTemplateDomain = (template: IPowercloudTemplate): string =>
+	const getDomain = (template: IPowercloudTemplate): string =>
 		template.primaryDomain ||
 		template.domain ||
 		template.subDomain ||
-		template.wildcardDomain
+		template.wildcardDomain ||
+		''
 
 	// 當選中的方案改變時，自動設置表單值
 	useEffect(() => {
@@ -355,7 +356,7 @@ const PowercloudOpenSite = () => {
 					? websiteTemplates.find((tpl) => tpl.id === templateId)
 					: undefined
 				const templateUrl = selectedTemplate
-					? getTemplateDomain(selectedTemplate)
+					? getDomain(selectedTemplate)
 					: undefined
 
 				createWordPress({
@@ -420,15 +421,16 @@ const PowercloudOpenSite = () => {
 						placeholder="請選擇網站模板"
 						loading={isLoadingTemplates}
 						options={websiteTemplates.map((tpl) => ({
-							label: getTemplateDomain(tpl),
+							label: getDomain(tpl),
 							value: tpl.id,
 						}))}
 						allowClear
 						showSearch
 						filterOption={(input, option) =>
-							(option?.label as string)
-								?.toLowerCase()
-								.includes(input.toLowerCase()) ?? false
+							(option?.label ?? '')
+								.toString()
+								.toLowerCase()
+								.includes(input.toLowerCase())
 						}
 						disabled={isPending}
 						getPopupContainer={() => containerRef.current as HTMLElement}
