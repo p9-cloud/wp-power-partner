@@ -88,21 +88,14 @@ final class DisableHooks {
 
 		$linked_site_ids = ShopSubscription::get_linked_site_ids($subscription_id);
 
-		// WPCD 的數據放在 subscription 的 meta data
-		foreach ($linked_site_ids as $site_id) {
-			Fetch::enable_site( (string) $site_id);
-		}
+		foreach ($items as $item) {
+			/** @var \WC_Order_Item_Product $item */
+			$product_id = $item->get_variation_id() ?: $item->get_product_id();
+			$host_type  = \get_post_meta($product_id, LinkedSites::HOST_TYPE_FIELD_NAME, true);
 
-		// PowerCloud: 優先從 pp_linked_site_ids 啟用，fallback 到 order item meta
-		$powercloud_handled = false;
-		if (!empty($linked_site_ids)) {
-			// 檢查是否有 PowerCloud 產品
-			foreach ($items as $item) {
-				/** @var \WC_Order_Item_Product $item */
-				$product_id = $item->get_variation_id() ?: $item->get_product_id();
-				$host_type  = \get_post_meta($product_id, LinkedSites::HOST_TYPE_FIELD_NAME, true);
-
-				if ($host_type === LinkedSites::DEFAULT_HOST_TYPE) {
+			// PowerCloud: 優先從 pp_linked_site_ids 啟用，fallback 到 order item meta
+			if ($host_type === LinkedSites::DEFAULT_HOST_TYPE) {
+				if (!empty($linked_site_ids)) {
 					foreach ($linked_site_ids as $site_id) {
 						FetchPowerCloud::enable_site((string) $current_user_id, (string) $site_id);
 						Plugin::logger(
@@ -114,56 +107,50 @@ final class DisableHooks {
 							]
 						);
 					}
-					$powercloud_handled = true;
-					break;
+					continue;
 				}
-			}
-		}
 
-		// Fallback: 從 order item meta 提取 websiteId（相容舊資料）
-		if (!$powercloud_handled) {
-			foreach ($items as $item) {
-				/** @var \WC_Order_Item_Product $item */
-				$product_id = $item->get_variation_id() ?: $item->get_product_id();
-				$host_type  = \get_post_meta($product_id, LinkedSites::HOST_TYPE_FIELD_NAME, true);
+				// Fallback: 從 order item meta 提取 websiteId（相容舊資料）
+				$website_id = null;
+				$order_item = $item->get_meta(SiteSync::CREATE_SITE_RESPONSES_ITEM_META_KEY);
 
-				if ($host_type === LinkedSites::DEFAULT_HOST_TYPE) {
-					$website_id = null;
-					$order_item = $item->get_meta(SiteSync::CREATE_SITE_RESPONSES_ITEM_META_KEY);
-
-					if (is_string($order_item) && !empty($order_item)) {
-						$responses = json_decode($order_item, true);
-						if (\is_array($responses) && !empty($responses)) {
-							$first_response = \reset($responses);
-							if (is_array($first_response) && isset($first_response['data']) && is_array($first_response['data']) && isset($first_response['data']['websiteId'])) {
-								$website_id = (string) $first_response['data']['websiteId'];
-							}
+				if (is_string($order_item) && !empty($order_item)) {
+					$responses = json_decode($order_item, true);
+					if (\is_array($responses) && !empty($responses)) {
+						$first_response = \reset($responses);
+						if (is_array($first_response) && isset($first_response['data']) && is_array($first_response['data']) && isset($first_response['data']['websiteId'])) {
+							$website_id = (string) $first_response['data']['websiteId'];
 						}
 					}
+				}
 
-					if (empty($website_id)) {
-						Plugin::logger(
-							"訂閱 #{$subscription_id} 的訂單項目 #{$item->get_id()} 找不到 websiteId",
-							'error',
-							[
-								'order_item' => $order_item,
-								'item_id'    => $item->get_id(),
-							]
-						);
-						continue;
-					}
-
-					FetchPowerCloud::enable_site((string) $current_user_id, $website_id);
+				if (empty($website_id)) {
 					Plugin::logger(
-						'restart WordPress site success',
-						'info',
+						"訂閱 #{$subscription_id} 的訂單項目 #{$item->get_id()} 找不到 websiteId",
+						'error',
 						[
-							'websiteId'       => $website_id,
-							'subscription_id' => $subscription_id,
+							'order_item' => $order_item,
+							'item_id'    => $item->get_id(),
 						]
 					);
 					continue;
 				}
+
+				FetchPowerCloud::enable_site((string) $current_user_id, $website_id);
+				Plugin::logger(
+					'restart WordPress site success',
+					'info',
+					[
+						'websiteId'       => $website_id,
+						'subscription_id' => $subscription_id,
+					]
+				);
+				continue;
+			}
+
+			// WPCD: 從 pp_linked_site_ids 啟用
+			foreach ($linked_site_ids as $site_id) {
+				Fetch::enable_site( (string) $site_id);
 			}
 		}
 	}

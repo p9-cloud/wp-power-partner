@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import {
 	Button,
 	Popconfirm,
@@ -48,9 +48,19 @@ export const SubscriptionBinding = ({
 	>(null)
 
 	// Customer search
-	const handleSearch = debounce((searchValue: string) => {
-		setSearch(searchValue)
-	}, 1000)
+	const handleSearch = useMemo(
+		() =>
+			debounce((searchValue: string) => {
+				setSearch(searchValue)
+			}, 1000),
+		[],
+	)
+
+	useEffect(() => {
+		return () => {
+			handleSearch.cancel()
+		}
+	}, [handleSearch])
 
 	const { data: searchedData, isFetching: isSearching } =
 		useQuery<TGetCustomersResponse>({
