@@ -1,3 +1,12 @@
+export interface ILabel {
+	id: string
+	key: string
+	value: string
+	isActive: boolean
+	createdAt: string
+	updatedAt: string
+}
+
 export interface IWebsite {
 	id: string
 	name: string
@@ -32,6 +41,10 @@ export interface IWebsite {
 	ipAddress: string
 	dailyCost?: number
 	memo?: string
+	phpVersion?: string
+	labels?: ILabel[]
+	packageId?: string
+	userId?: string
 	createdAt: string
 	updatedAt: string
 }
