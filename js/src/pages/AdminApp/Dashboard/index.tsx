@@ -9,7 +9,7 @@ import {
 	CloudOutlined,
 } from '@ant-design/icons'
 import { Tabs, TabsProps, Form, Button } from 'antd'
-import { HashRouter, Routes, Route } from 'react-router-dom'
+import { HashRouter, Routes, Route } from 'react-router'
 import AccountIcon from './AccountIcon'
 import SiteList from './SiteList'
 import LogList from './LogList'

@@ -8,7 +8,7 @@ import {
 } from '@ant-design/icons'
 import { Button, Dropdown, Modal, Popconfirm, Tooltip } from 'antd'
 import type { MenuProps } from 'antd'
-import { Link } from 'react-router-dom'
+import { Link } from 'react-router'
 import type { IWebsite } from './types'
 
 interface WebsiteActionButtonsProps {

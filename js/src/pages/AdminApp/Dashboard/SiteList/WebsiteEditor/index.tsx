@@ -1,7 +1,7 @@
 import { ArrowLeftOutlined, EditOutlined, GlobalOutlined } from '@ant-design/icons'
 import { useQuery } from '@tanstack/react-query'
 import { Breadcrumb, Button, Skeleton } from 'antd'
-import { Link, useNavigate, useParams } from 'react-router-dom'
+import { Link, useNavigate, useParams } from 'react-router'
 
 import { powerCloudAxios, usePowerCloudAxiosWithApiKey } from '@/api'
 import type { IWebsite } from '../types'
