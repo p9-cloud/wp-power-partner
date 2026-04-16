@@ -46,6 +46,7 @@ import ContentCard from '@/components/ContentCard'
 import { globalLoadingAtom, identityAtom } from '@/pages/AdminApp/Atom/atom'
 import WebsiteActionButtons from './WebsiteActionButtons'
 import WebsiteListFilter, {
+	defaultFilters,
 	WebsiteFilters,
 } from './WebsiteListFilter'
 import type { IWebsite, IWebsiteResponse } from './types'
@@ -159,14 +160,21 @@ const PowercloudContent = () => {
 	const setTab = useSetAtom(setTabAtom)
 	const powerCloudInstance = usePowerCloudAxiosWithApiKey(powerCloudAxios)
 	const [pagination, setPagination] = useState({ page: 1, limit: 10 })
-	const [searchFilters, setSearchFilters] = useState<WebsiteFilters | null>(
-		null
-	)
+	const [searchFilters, setSearchFilters] =
+		useState<WebsiteFilters>(defaultFilters)
+	const [hasSearched, setHasSearched] = useState(false)
 	const [isChangeDomainModalOpen, setIsChangeDomainModalOpen] = useState(false)
 	const [selectedWebsite, setSelectedWebsite] = useState<IWebsite | null>(null)
 	const [form] = Form.useForm()
 
-	const { data, isLoading, refetch, isFetching } = useQuery({
+	const {
+		data,
+		isLoading,
+		refetch,
+		isFetching,
+		isError,
+		error,
+	} = useQuery({
 		queryKey: [
 			'powercloud-websites',
 			pagination.page,
@@ -178,30 +186,29 @@ const PowercloudContent = () => {
 				page: String(pagination.page),
 				limit: String(pagination.limit),
 			})
-			if (searchFilters) {
-				if (searchFilters.websiteKeyword)
-					params.set('websiteKeyword', searchFilters.websiteKeyword)
-				if (searchFilters.userKeyword)
-					params.set('userKeyword', searchFilters.userKeyword)
-				if (searchFilters.status) params.set('status', searchFilters.status)
-				if (searchFilters.startDailyCostPrice != null)
-					params.set(
-						'startDailyCostPrice',
-						String(searchFilters.startDailyCostPrice)
-					)
-				if (searchFilters.endDailyCostPrice != null)
-					params.set(
-						'endDailyCostPrice',
-						String(searchFilters.endDailyCostPrice)
-					)
-				if (searchFilters.startDate)
-					params.set('startDate', searchFilters.startDate)
-				if (searchFilters.endDate) params.set('endDate', searchFilters.endDate)
-			}
+			if (searchFilters.websiteKeyword)
+				params.set('websiteKeyword', searchFilters.websiteKeyword)
+			if (searchFilters.userKeyword)
+				params.set('userKeyword', searchFilters.userKeyword)
+			if (searchFilters.status) params.set('status', searchFilters.status)
+			if (searchFilters.startDailyCostPrice != null)
+				params.set(
+					'startDailyCostPrice',
+					String(searchFilters.startDailyCostPrice)
+				)
+			if (searchFilters.endDailyCostPrice != null)
+				params.set(
+					'endDailyCostPrice',
+					String(searchFilters.endDailyCostPrice)
+				)
+			if (searchFilters.startDate)
+				params.set('startDate', searchFilters.startDate)
+			if (searchFilters.endDate) params.set('endDate', searchFilters.endDate)
 			return powerCloudInstance.get<IWebsiteResponse>(
 				`/websites?${params.toString()}`
 			)
 		},
+		retry: 2,
 	})
 
 	const { mutate: deleteWebsite } = useMutation({
@@ -295,6 +302,7 @@ const PowercloudContent = () => {
 	const handleSearch = useCallback(
 		(filters: WebsiteFilters) => {
 			setSearchFilters(filters)
+			setHasSearched(true)
 			setPagination((prev) => ({ ...prev, page: 1 }))
 		},
 		[]
@@ -522,11 +530,26 @@ const PowercloudContent = () => {
 					新增網站
 				</Button>
 			</div>
-			<ContentCard>
+			{/* <ContentCard>
 				<WebsiteListFilter onSearch={handleSearch} />
-			</ContentCard>
+			</ContentCard> */}
 
-			{!websites.length && !searchFilters ? (
+			{isError && (
+				<Alert
+					message="載入網站列表失敗"
+					description={
+						(error as any)?.response?.data?.message ||
+						(error as Error)?.message ||
+						'請稍後再試'
+					}
+					type="error"
+					showIcon
+					closable
+					className="mb-4"
+				/>
+			)}
+
+			{!websites.length && !hasSearched && !isError ? (
 				<ContentCard>
 					<div style={{ padding: '60px 0', textAlign: 'center' }}>
 						<Text type="secondary">尚無網站資料，請前往「手動開站」建立您的第一個網站</Text>
