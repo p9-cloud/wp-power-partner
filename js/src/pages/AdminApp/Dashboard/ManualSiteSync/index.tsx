@@ -401,7 +401,6 @@ const PowercloudOpenSite = () => {
 					rules={[{ required: true, message: '請選擇方案' }]}
 				>
 					<Select
-						placeholder="選擇方案"
 						loading={isLoadingPackages}
 						options={websitePackages.map((pkg) => ({
 							label: `${pkg.name} - NT$ ${pkg.price}`,
@@ -415,10 +414,9 @@ const PowercloudOpenSite = () => {
 				<Form.Item
 					label="網站模板"
 					name={['templateId']}
-					help="選擇一個模板來創建網站"
+					help="如不選擇，會開空白的 WordPress 站台"
 				>
 					<Select
-						placeholder="請選擇網站模板"
 						loading={isLoadingTemplates}
 						options={websiteTemplates.map((tpl) => ({
 							label: getDomain(tpl),
