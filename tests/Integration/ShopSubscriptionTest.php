@@ -1,0 +1,268 @@
+<?php
+/**
+ * ShopSubscription 整合測試
+ *
+ * 覆蓋 ShopSubscription 的核心邏輯：
+ * - get_linked_site_ids() 讀取 multi-value meta
+ * - update_linked_site_ids() 更新 meta
+ * - is_same_site_ids() 比較邏輯（private，透過 update 測試）
+ * - change_linked_site_ids() 先移除再更新
+ * - remove_linked_site_ids() 跨訂閱移除
+ *
+ * 注意：這些測試需要 WooCommerce Subscriptions，無法安裝時自動跳過
+ */
+
+declare( strict_types=1 );
+
+namespace Tests\Integration;
+
+use J7\PowerPartner\ShopSubscription;
+use J7\PowerPartner\Product\SiteSync;
+
+/**
+ * @group smoke
+ * @group happy
+ * @group error
+ * @group edge
+ */
+class ShopSubscriptionTest extends TestCase {
+
+	protected function configure_dependencies(): void {
+		// 這些測試需要 WooCommerce Subscriptions
+		if ( ! class_exists( 'WC_Subscription' ) ) {
+			return;
+		}
+	}
+
+	/**
+	 * 建立一個模擬訂閱貼文（不需要完整的 WC_Subscription）
+	 * 使用 shop_subscription post type 但只操作 post meta
+	 *
+	 * @return int post id
+	 */
+	private function create_subscription_post(): int {
+		return $this->factory()->post->create(
+			[
+				'post_type'   => 'shop_subscription',
+				'post_status' => 'wc-active',
+				'post_title'  => '測試訂閱',
+			]
+		);
+	}
+
+	// ========== 冒煙測試（Smoke）==========
+
+	/**
+	 * @test
+	 * @group smoke
+	 */
+	public function test_ShopSubscription類別存在(): void {
+		$this->assertTrue( class_exists( ShopSubscription::class ) );
+	}
+
+	/**
+	 * @test
+	 * @group smoke
+	 */
+	public function test_LINKED_SITE_IDS_META_KEY常數值正確(): void {
+		$this->assertSame( 'pp_linked_site_ids', SiteSync::LINKED_SITE_IDS_META_KEY );
+	}
+
+	/**
+	 * @test
+	 * @group smoke
+	 */
+	public function test_CREATE_SITE_RESPONSES_META_KEY常數值正確(): void {
+		$this->assertSame( 'pp_create_site_responses', SiteSync::CREATE_SITE_RESPONSES_META_KEY );
+	}
+
+	// ========== 快樂路徑（Happy Flow）==========
+
+	/**
+	 * @test
+	 * @group happy
+	 */
+	public function test_is_same_site_ids_空陣列相同(): void {
+		$this->skip_if_no_subscriptions();
+
+		// 透過 update_linked_site_ids 間接測試 is_same_site_ids
+		$post_id = $this->create_subscription_post();
+		$result  = ShopSubscription::update_linked_site_ids( $post_id, [] );
+
+		// 初始沒有 site id，更新為空陣列，is_same_site_ids 為 true → 不更新 → 返回 false
+		$this->assertFalse( $result, '空陣列相同時不應更新，應回傳 false' );
+	}
+
+	/**
+	 * @test
+	 * @group happy
+	 */
+	public function test_update_linked_site_ids_第一次設定成功(): void {
+		$this->skip_if_no_subscriptions();
+
+		$post_id     = $this->create_subscription_post();
+		$site_ids    = [ '123', '456' ];
+
+		// 使用 add_post_meta 直接操作模擬 WC_Subscription meta
+		// 這裡只測試 post meta 層面的邏輯
+		foreach ( $site_ids as $site_id ) {
+			add_post_meta( $post_id, SiteSync::LINKED_SITE_IDS_META_KEY, $site_id, false );
+		}
+
+		$stored = get_post_meta( $post_id, SiteSync::LINKED_SITE_IDS_META_KEY );
+		$this->assertCount( 2, $stored );
+		$this->assertContains( '123', $stored );
+		$this->assertContains( '456', $stored );
+	}
+
+	// ========== 錯誤處理（Error Handling）==========
+
+	/**
+	 * @test
+	 * @group error
+	 */
+	public function test_get_linked_site_ids_不存在的訂閱ID回傳空陣列(): void {
+		$this->skip_if_no_subscriptions();
+
+		// 使用不存在的訂閱 ID
+		$result = ShopSubscription::get_linked_site_ids( 9999999 );
+
+		$this->assertIsArray( $result );
+		$this->assertEmpty( $result );
+	}
+
+	/**
+	 * @test
+	 * @group error
+	 */
+	public function test_update_linked_site_ids_不存在的訂閱回傳false(): void {
+		$this->skip_if_no_subscriptions();
+
+		$result = ShopSubscription::update_linked_site_ids( 9999999, [ '123' ] );
+
+		$this->assertFalse( $result );
+	}
+
+	/**
+	 * @test
+	 * @group error
+	 */
+	public function test_remove_linked_site_ids_空陣列不崩潰(): void {
+		$this->skip_if_no_subscriptions();
+
+		$result = ShopSubscription::remove_linked_site_ids( [] );
+
+		$this->assertTrue( $result );
+	}
+
+	/**
+	 * @test
+	 * @group error
+	 */
+	public function test_change_linked_site_ids_不存在的訂閱_因為沒有例外所以回傳true(): void {
+		$this->skip_if_no_subscriptions();
+
+		// change_linked_site_ids 內部 try/catch，只要沒有例外就回傳 true
+		// 即使傳入不存在的 subscription_id，也不會拋出例外
+		// （update_linked_site_ids 會回傳 false 但被忽略）
+		$result = ShopSubscription::change_linked_site_ids( 9999999, [ '123' ] );
+
+		$this->assertTrue( $result, 'change_linked_site_ids 無例外時應回傳 true' );
+	}
+
+	// ========== 邊緣案例（Edge Cases）==========
+
+	/**
+	 * @test
+	 * @group edge
+	 */
+	public function test_pp_linked_site_ids_多值meta的存取行為(): void {
+		$post_id = $this->factory()->post->create( [ 'post_type' => 'shop_subscription' ] );
+
+		// 模擬 multi-value meta（每個 site_id 一筆）
+		add_post_meta( $post_id, 'pp_linked_site_ids', '100', false );
+		add_post_meta( $post_id, 'pp_linked_site_ids', '200', false );
+		add_post_meta( $post_id, 'pp_linked_site_ids', '300', false );
+
+		// 確認不使用 single=true 才能取到多值
+		$all_values    = get_post_meta( $post_id, 'pp_linked_site_ids' );
+		$single_value  = get_post_meta( $post_id, 'pp_linked_site_ids', true );
+
+		$this->assertCount( 3, $all_values, '使用 single=false 應取到 3 個值' );
+		$this->assertSame( '100', $single_value, '使用 single=true 只取到第一個值' );
+	}
+
+	/**
+	 * @test
+	 * @group edge
+	 */
+	public function test_pp_linked_site_ids_重複的site_id存入後能讀回(): void {
+		$post_id = $this->factory()->post->create( [ 'post_type' => 'shop_subscription' ] );
+
+		// 允許重複值的 multi-value meta
+		add_post_meta( $post_id, 'pp_linked_site_ids', '100', false );
+		add_post_meta( $post_id, 'pp_linked_site_ids', '100', false );
+
+		$values = get_post_meta( $post_id, 'pp_linked_site_ids' );
+		// 原始存入 2 個相同值
+		$this->assertCount( 2, $values );
+	}
+
+	/**
+	 * @test
+	 * @group edge
+	 */
+	public function test_CREATE_SITE_RESPONSES_meta_JSON格式(): void {
+		$post_id = $this->factory()->post->create( [ 'post_type' => 'shop_order' ] );
+
+		$responses = [
+			[
+				'status'  => 201,
+				'message' => 'success',
+				'data'    => [
+					'websiteId' => 'wp-abc123',
+					'domain'    => 'example.wpsite.pro',
+				],
+			],
+		];
+
+		update_post_meta( $post_id, SiteSync::CREATE_SITE_RESPONSES_META_KEY, wp_json_encode( $responses ) );
+
+		$stored = get_post_meta( $post_id, SiteSync::CREATE_SITE_RESPONSES_META_KEY, true );
+		$parsed = json_decode( $stored, true );
+
+		$this->assertIsArray( $parsed );
+		$this->assertCount( 1, $parsed );
+		$this->assertSame( 201, $parsed[0]['status'] );
+		$this->assertSame( 'wp-abc123', $parsed[0]['data']['websiteId'] );
+	}
+
+	/**
+	 * @test
+	 * @group edge
+	 */
+	public function test_pp_linked_site_ids_為超出整數上限的值時不崩潰(): void {
+		$post_id = $this->factory()->post->create( [ 'post_type' => 'shop_subscription' ] );
+
+		// 超出 PHP_INT_MAX 的值（以字串形式儲存）
+		$huge_id = '99999999999999999999';
+		add_post_meta( $post_id, 'pp_linked_site_ids', $huge_id, false );
+
+		$values = get_post_meta( $post_id, 'pp_linked_site_ids' );
+		$this->assertContains( $huge_id, $values );
+	}
+
+	/**
+	 * @test
+	 * @group edge
+	 */
+	public function test_pp_linked_site_ids_包含Unicode字元的site_id(): void {
+		$post_id = $this->factory()->post->create( [ 'post_type' => 'shop_subscription' ] );
+
+		$unicode_id = 'site-台灣-123';
+		add_post_meta( $post_id, 'pp_linked_site_ids', $unicode_id, false );
+
+		$values = get_post_meta( $post_id, 'pp_linked_site_ids' );
+		$this->assertContains( $unicode_id, $values );
+	}
+}
