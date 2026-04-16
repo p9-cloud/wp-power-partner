@@ -1,6 +1,7 @@
 import { useMutation } from '@tanstack/react-query'
 import { Button, Form, Input, Alert, notification } from 'antd'
 import { useAtomValue, useSetAtom } from 'jotai'
+import ContentCard from '@/components/ContentCard'
 
 import { powerCloudAxios, axios } from '@/api'
 import { globalLoadingAtom } from '@/pages/AdminApp/Atom/atom'
@@ -131,8 +132,16 @@ const Logout = () => {
 const index = () => {
 	const powercloudIdentity = useAtomValue(powercloudIdentityAtom)
 	if (powercloudIdentity.status === EPowercloudIdentityStatusEnum.UN_LOGIN)
-		return <Login />
-	return <Logout />
+		return (
+			<ContentCard>
+				<Login />
+			</ContentCard>
+		)
+	return (
+		<ContentCard>
+			<Logout />
+		</ContentCard>
+	)
 }
 
 export default index

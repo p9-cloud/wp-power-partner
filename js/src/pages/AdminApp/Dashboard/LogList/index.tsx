@@ -3,6 +3,7 @@ import { DataType, TLogParams } from './types'
 import { identityAtom } from '@/pages/AdminApp/Atom/atom'
 import { useAtomValue } from 'jotai'
 import { useTable } from '@/hooks'
+import ContentCard from '@/components/ContentCard'
 
 const { Paragraph } = Typography
 
@@ -79,7 +80,11 @@ const index = () => {
 			),
 		},
 	]
-	return <Table rowKey="id" {...tableProps} columns={columns} />
+	return (
+		<ContentCard>
+			<Table rowKey="id" {...tableProps} columns={columns} />
+		</ContentCard>
+	)
 }
 
 export default index

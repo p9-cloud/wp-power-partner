@@ -1,9 +1,9 @@
 import {
+	GlobalOutlined,
 	LinkOutlined,
+	PlayCircleOutlined,
 	ReloadOutlined,
-	SettingOutlined,
 	StopOutlined,
-	SyncOutlined,
 } from '@ant-design/icons'
 import { useQuery, useMutation } from '@tanstack/react-query'
 import {
@@ -73,6 +73,7 @@ interface IWebsite {
 	} | null
 	phpPodSize: number
 	ipAddress: string
+	memo?: string
 	createdAt: string
 	updatedAt: string
 }
@@ -206,6 +207,16 @@ const Powercloud = () => {
 			),
 		},
 		{
+			title: '備註',
+			dataIndex: 'memo',
+			key: 'memo',
+			width: 150,
+			ellipsis: true,
+			render: (memo?: string) => (
+				<Text ellipsis={{ tooltip: memo }}>{memo || '-'}</Text>
+			),
+		},
+		{
 			title: '建立時間',
 			dataIndex: 'createdAt',
 			key: 'createdAt',
@@ -234,7 +245,7 @@ const Powercloud = () => {
 							<Button
 								type="link"
 								size="small"
-								icon={<SettingOutlined />}
+								icon={<GlobalOutlined />}
 								href={`https://${getDomain(record)}/wp-admin`}
 								target="_blank"
 							/>
@@ -248,7 +259,7 @@ const Powercloud = () => {
 								cancelText="取消"
 							>
 								<Tooltip title="啟動站台">
-									<Button type="link" size="small" icon={<SyncOutlined />} />
+									<Button type="link" size="small" icon={<PlayCircleOutlined />} />
 								</Tooltip>
 							</Popconfirm>
 						)}

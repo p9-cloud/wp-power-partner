@@ -1,19 +1,16 @@
 import {
 	CloudOutlined,
-	DeleteOutlined,
-	EditOutlined,
+	CopyOutlined,
 	GlobalOutlined,
 	LinkOutlined,
+	PlusOutlined,
 	ReloadOutlined,
-	SettingOutlined,
-	StopOutlined,
 	SyncOutlined,
 } from '@ant-design/icons'
 import { useMutation, useQuery } from '@tanstack/react-query'
 import {
 	Alert,
 	Button,
-	Empty,
 	Form,
 	Input,
 	InputNumber,
@@ -31,7 +28,7 @@ import {
 } from 'antd'
 import type { ColumnsType } from 'antd/es/table'
 import { useAtomValue, useSetAtom } from 'jotai'
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 
 import {
 	EPowercloudIdentityStatusEnum,
@@ -45,7 +42,16 @@ import {
 	useCustomers,
 	useTable,
 } from '@/components/SiteListTable'
+import ContentCard from '@/components/ContentCard'
 import { globalLoadingAtom, identityAtom } from '@/pages/AdminApp/Atom/atom'
+import WebsiteActionButtons from './WebsiteActionButtons'
+import WebsiteListFilter, {
+	defaultFilters,
+	WebsiteFilters,
+} from './WebsiteListFilter'
+import type { IWebsite, IWebsiteResponse } from './types'
+import { useSubscriptionApps } from './hooks/useSubscriptionApps'
+import { SubscriptionBinding } from './SubscriptionBinding'
 
 const { Text, Link } = Typography
 
@@ -65,58 +71,19 @@ const statusTextMap: Record<string, string> = {
 	deleting: '刪除中',
 }
 
-interface IWebsite {
-	id: string
-	name: string
-	domain?: string
-	primaryDomain?: string
-	subDomain?: string
-	wildcardDomain: string
-	namespace: string
-	status: string
-	adminUsername: string
-	adminEmail: string
-	adminPassword: string
-	databaseName: string
-	databaseUsername: string
-	databasePassword: string | null
-	databaseRootPassword: string | null
-	package: {
-		id: string
-		name: string
-		description: string
-		price: string
-		wordpressSize: string
-		mysqlSize: string
-	} | null
-	user: {
-		id: string
-		firstName: string
-		lastName: string
-		email: string
-	} | null
-	phpPodSize: number
-	ipAddress: string
-	createdAt: string
-	updatedAt: string
-}
-
-interface IWebsiteResponse {
-	data: IWebsite[]
-	total: number
-}
-
 // 容器數量編輯組件
 const PodSizeEditor = ({
 	initialValue,
 	domain,
 	packagePrice,
 	onUpdate,
+	disabled,
 }: {
 	initialValue: number
 	domain: string
 	packagePrice?: string
 	onUpdate: (value: number) => void
+	disabled?: boolean
 }) => {
 	const [value, setValue] = useState(initialValue)
 
@@ -135,6 +102,7 @@ const PodSizeEditor = ({
 				value={value}
 				onChange={(v) => setValue(v ?? 1)}
 				size="small"
+				disabled={disabled}
 			/>
 			<Tooltip title="更新容器數量">
 				<Popconfirm
@@ -164,8 +132,14 @@ const PodSizeEditor = ({
 					onConfirm={() => onUpdate(value)}
 					okText="確認更新"
 					cancelText="取消"
+					disabled={disabled}
 				>
-					<Button type="link" size="small" icon={<SyncOutlined />} />
+					<Button
+						type="link"
+						size="small"
+						icon={<SyncOutlined />}
+						disabled={disabled}
+					/>
 				</Popconfirm>
 			</Tooltip>
 		</div>
@@ -183,18 +157,58 @@ const getDomain = (website: IWebsite): string => {
 }
 
 const PowercloudContent = () => {
+	const setTab = useSetAtom(setTabAtom)
 	const powerCloudInstance = usePowerCloudAxiosWithApiKey(powerCloudAxios)
 	const [pagination, setPagination] = useState({ page: 1, limit: 10 })
+	const [searchFilters, setSearchFilters] =
+		useState<WebsiteFilters>(defaultFilters)
+	const [hasSearched, setHasSearched] = useState(false)
 	const [isChangeDomainModalOpen, setIsChangeDomainModalOpen] = useState(false)
 	const [selectedWebsite, setSelectedWebsite] = useState<IWebsite | null>(null)
 	const [form] = Form.useForm()
 
-	const { data, isLoading, refetch, isFetching } = useQuery({
-		queryKey: ['powercloud-websites', pagination.page, pagination.limit],
-		queryFn: () =>
-			powerCloudInstance.get<IWebsiteResponse>(
-				`/websites?page=${pagination.page}&limit=${pagination.limit}`
-			),
+	const {
+		data,
+		isLoading,
+		refetch,
+		isFetching,
+		isError,
+		error,
+	} = useQuery({
+		queryKey: [
+			'powercloud-websites',
+			pagination.page,
+			pagination.limit,
+			searchFilters,
+		],
+		queryFn: () => {
+			const params = new URLSearchParams({
+				page: String(pagination.page),
+				limit: String(pagination.limit),
+			})
+			if (searchFilters.websiteKeyword)
+				params.set('websiteKeyword', searchFilters.websiteKeyword)
+			if (searchFilters.userKeyword)
+				params.set('userKeyword', searchFilters.userKeyword)
+			if (searchFilters.status) params.set('status', searchFilters.status)
+			if (searchFilters.startDailyCostPrice != null)
+				params.set(
+					'startDailyCostPrice',
+					String(searchFilters.startDailyCostPrice)
+				)
+			if (searchFilters.endDailyCostPrice != null)
+				params.set(
+					'endDailyCostPrice',
+					String(searchFilters.endDailyCostPrice)
+				)
+			if (searchFilters.startDate)
+				params.set('startDate', searchFilters.startDate)
+			if (searchFilters.endDate) params.set('endDate', searchFilters.endDate)
+			return powerCloudInstance.get<IWebsiteResponse>(
+				`/websites?${params.toString()}`
+			)
+		},
+		retry: 2,
 	})
 
 	const { mutate: deleteWebsite } = useMutation({
@@ -245,226 +259,12 @@ const PowercloudContent = () => {
 	const websites = data?.data?.data || []
 	const total = data?.data?.total || 0
 
-	const columns: ColumnsType<IWebsite> = [
-		{
-			title: '網站名稱',
-			dataIndex: 'name',
-			key: 'name',
-			ellipsis: true,
-			width: 300,
-			render: (name: string, record) => (
-				<Space direction="vertical" size={0}>
-					<Link
-						href={`https://${getDomain(record)}`}
-						target="_blank"
-						style={{ fontSize: 14 }}
-					>
-						<LinkOutlined /> {getDomain(record)}
-					</Link>
-					<Text className="text-xs text-gray-500">{name}</Text>
-				</Space>
-			),
-		},
-		{
-			title: '狀態',
-			dataIndex: 'status',
-			key: 'status',
-			width: 100,
-			render: (status: string) => (
-				<Tag color={statusColorMap[status] || 'default'}>
-					{statusTextMap[status] || status}
-				</Tag>
-			),
-		},
-		{
-			title: 'IP 位址',
-			dataIndex: 'ipAddress',
-			key: 'ipAddress',
-			width: 150,
-			render: (ipAddress: string) => (
-				<Text copyable={{ text: ipAddress }}>{ipAddress}</Text>
-			),
-		},
-		{
-			title: '方案',
-			dataIndex: 'package',
-			key: 'package',
-			width: 200,
-			render: (pkg: IWebsite['package']) =>
-				pkg ? (
-					<Space direction="vertical" size={0}>
-						<Text>{pkg.name}</Text>
-						<Text type="secondary" style={{ fontSize: 12 }}>
-							NT$ {pkg.price}/年
-						</Text>
-					</Space>
-				) : (
-					<Text type="secondary">-</Text>
-				),
-		},
-		{
-			title: '網站擁有者',
-			dataIndex: 'user',
-			key: 'user',
-			width: 250,
-			render: (user: IWebsite['user']) => (
-				<>
-					<div>
-						<Text>
-							{user?.firstName ?? ''} {user?.lastName ?? ''}
-						</Text>
-					</div>
-
-					<Text type="secondary" style={{ fontSize: 12 }}>
-						{user?.email ?? ''}
-					</Text>
-				</>
-			),
-		},
-		{
-			title: '每日扣款',
-			dataIndex: 'dailyCost',
-			key: 'dailyCost',
-			width: 150,
-			render: (dailyCost: number) => {
-				return <Text>NT$ {dailyCost}/日</Text>
-			},
-		},
-		{
-			title: '容器數量',
-			dataIndex: 'phpPodSize',
-			key: 'phpPodSize',
-			width: 150,
-			render: (phpPodSize: number, record) => (
-				<PodSizeEditor
-					initialValue={phpPodSize ?? 1}
-					domain={record.domain}
-					packagePrice={record.package?.price}
-					onUpdate={(value) => handlePodSizeChange(record.id, value)}
-				/>
-			),
-		},
-		{
-			title: 'WordPress 管理員信箱',
-			dataIndex: 'adminEmail',
-			key: 'adminEmail',
-			ellipsis: true,
-			width: 250,
-			render: (email: string) => (
-				<Text copyable ellipsis>
-					{email}
-				</Text>
-			),
-		},
-		{
-			title: 'WordPress 管理員密碼',
-			key: 'adminPassword',
-			width: 250,
-			render: (_, record) => (
-				<Text copyable={{ text: record.adminPassword }}>••••••••</Text>
-			),
-		},
-		{
-			title: '建立時間',
-			dataIndex: 'createdAt',
-			key: 'createdAt',
-			width: 200,
-			render: (date: string) => (
-				<Text type="secondary">
-					{new Date(date).toLocaleString('zh-TW', {
-						year: 'numeric',
-						month: '2-digit',
-						day: '2-digit',
-						hour: '2-digit',
-						minute: '2-digit',
-					})}
-				</Text>
-			),
-		},
-		{
-			title: '操作',
-			key: 'actions',
-			fixed: 'right',
-			width: 180,
-			render: (_, record) => {
-				return (
-					<Space>
-						<Tooltip title="前往後台">
-							<Button
-								type="link"
-								size="small"
-								icon={<SettingOutlined />}
-								href={`https://${record.domain}/wp-admin`}
-								target="_blank"
-							/>
-						</Tooltip>
-						{/* <Popconfirm
-							title="確認變更域名"
-							description={`確定要變更站台 ${record.domain} 的域名嗎？`}
-							onConfirm={() => handleShowChangeDomainModal(record)}
-							okText="確認變更"
-							cancelText="取消"
-						>
-							<Tooltip title="變更域名">
-								<Button type="link" size="small" icon={<EditOutlined />} />
-							</Tooltip>
-						</Popconfirm> */}
-						{record.status === 'stopped' && (
-							<Popconfirm
-								title="確認啟動站台"
-								description={`確定要啟動站台 ${record.domain} 嗎？`}
-								onConfirm={() => handleStart(record.id)}
-								okText="確認啟動"
-								cancelText="取消"
-							>
-								<Tooltip title="啟動站台">
-									<Button type="link" size="small" icon={<SyncOutlined />} />
-								</Tooltip>
-							</Popconfirm>
-						)}
-						{record.status === 'running' && (
-							<Popconfirm
-								title="確認停止站台"
-								description={`確定要停止站台 ${record.domain} 嗎？`}
-								onConfirm={() => handleStop(record.id)}
-								okText="確認停止"
-								cancelText="取消"
-								okButtonProps={{ danger: true }}
-							>
-								<Tooltip title="停止站台">
-									<Button
-										type="link"
-										size="small"
-										danger
-										icon={<StopOutlined />}
-									/>
-								</Tooltip>
-							</Popconfirm>
-						)}
-						{record.status !== 'creating' && (
-							<Popconfirm
-								title="確認刪除站台"
-								description={`確定要刪除站台 ${record.domain} 嗎？此操作無法復原。`}
-								onConfirm={() => handleDelete(record.id)}
-								okText="確認刪除"
-								cancelText="取消"
-								okButtonProps={{ danger: true }}
-							>
-								<Tooltip title="刪除站台">
-									<Button
-										type="link"
-										size="small"
-										danger
-										icon={<DeleteOutlined />}
-									/>
-								</Tooltip>
-							</Popconfirm>
-						)}
-					</Space>
-				)
-			},
-		},
-	]
+	// Batch query subscription mapping for all loaded websites
+	const websiteIds = websites.map((w: IWebsite) => w.id)
+	const {
+		subscriptionMap,
+		refetch: refetchApps,
+	} = useSubscriptionApps({ websiteIds })
 
 	const handleDelete = (id: string) => {
 		deleteWebsite(id)
@@ -499,6 +299,215 @@ const PowercloudContent = () => {
 		})
 	}
 
+	const handleSearch = useCallback(
+		(filters: WebsiteFilters) => {
+			setSearchFilters(filters)
+			setHasSearched(true)
+			setPagination((prev) => ({ ...prev, page: 1 }))
+		},
+		[]
+	)
+
+	const columns: ColumnsType<IWebsite> = [
+		{
+			title: '網站資訊',
+			key: 'siteInfo',
+			ellipsis: true,
+			width: 280,
+			render: (_, record) => {
+				const domain = getDomain(record)
+				return (
+					<Space direction="vertical" size={0}>
+						<div className="flex items-center gap-1">
+							<Link
+								href={`https://${domain}`}
+								target="_blank"
+								style={{ fontSize: 14 }}
+							>
+								<LinkOutlined /> {domain}
+							</Link>
+							<Text
+								copyable={{ text: domain, icon: <CopyOutlined /> }}
+								style={{ fontSize: 12 }}
+							/>
+						</div>
+						<div className="flex items-center gap-1">
+							<Text className="text-xs text-gray-500">{record.namespace}</Text>
+							<Text
+								copyable={{
+									text: record.namespace,
+									icon: <CopyOutlined style={{ fontSize: 10 }} />,
+								}}
+								style={{ fontSize: 10 }}
+							/>
+						</div>
+					</Space>
+				)
+			},
+		},
+		{
+			title: '狀態',
+			dataIndex: 'status',
+			key: 'status',
+			width: 100,
+			render: (status: string) => (
+				<Tag bordered={false} color={statusColorMap[status] || 'default'}>
+					{statusTextMap[status] || status}
+				</Tag>
+			),
+		},
+		{
+			title: '管理員電子郵件',
+			dataIndex: 'adminEmail',
+			key: 'adminEmail',
+			ellipsis: true,
+			width: 220,
+			render: (email: string) => (
+				<Text copyable ellipsis>
+					{email}
+				</Text>
+			),
+		},
+		{
+			title: '管理員密碼',
+			key: 'adminPassword',
+			width: 180,
+			render: (_, record) => (
+				<Text copyable={{ text: record.adminPassword }}>•••••••••••</Text>
+			),
+		},
+		{
+			title: 'IP 地址',
+			dataIndex: 'ipAddress',
+			key: 'ipAddress',
+			ellipsis: true,
+			width: 150,
+			render: (ipAddress: string) =>
+				ipAddress ? (
+					<Text copyable={{ text: ipAddress }} ellipsis>
+						{ipAddress}
+					</Text>
+				) : (
+					<Text type="secondary">-</Text>
+				),
+		},
+		{
+			title: '網站方案',
+			dataIndex: 'package',
+			key: 'package',
+			width: 160,
+			render: (pkg: IWebsite['package']) =>
+				pkg ? (
+					<div className="flex flex-col">
+						<Text className="text-gray-600">{pkg.name}</Text>
+						<Text className="text-xs text-gray-400">
+							$NT {pkg.price}/年
+						</Text>
+					</div>
+				) : (
+					<Text type="secondary">-</Text>
+				),
+		},
+		{
+			title: '網站擁有者',
+			dataIndex: 'user',
+			key: 'user',
+			width: 160,
+			render: (user: IWebsite['user']) => (
+				<Text className="text-blue-500">
+					{user ? `${user.firstName ?? ''} ${user.lastName ?? ''}`.trim() : '-'}
+				</Text>
+			),
+		},
+		{
+			title: '每日扣款',
+			dataIndex: 'dailyCost',
+			key: 'dailyCost',
+			width: 130,
+			sorter: true,
+			render: (dailyCost: number) => {
+				return <Text className="font-medium">${dailyCost}</Text>
+			},
+		},
+		{
+			title: '容器數量',
+			dataIndex: 'phpPodSize',
+			key: 'phpPodSize',
+			width: 160,
+			render: (phpPodSize: number, record) => {
+				const isDisabled =
+					record.status === 'creating' || record.status === 'stopped'
+				return (
+					<PodSizeEditor
+						initialValue={phpPodSize ?? 1}
+						domain={getDomain(record)}
+						packagePrice={record.package?.price}
+						onUpdate={(value) => handlePodSizeChange(record.id, value)}
+						disabled={isDisabled}
+					/>
+				)
+			},
+		},
+		{
+			title: '備註',
+			dataIndex: 'memo',
+			key: 'memo',
+			width: 150,
+			ellipsis: true,
+			render: (memo?: string) => (
+				<Text ellipsis={{ tooltip: memo }}>{memo || '-'}</Text>
+			),
+		},
+		{
+			title: '對應訂閱',
+			key: 'subscription',
+			width: 200,
+			render: (_: unknown, record: IWebsite) => {
+				const subscriptionIds = subscriptionMap[record.id] || []
+				return (
+					<SubscriptionBinding
+						websiteId={record.id}
+						subscriptionIds={subscriptionIds}
+						onBindingChange={() => refetchApps()}
+					/>
+				)
+			},
+		},
+		{
+			title: '建立時間',
+			dataIndex: 'createdAt',
+			key: 'createdAt',
+			width: 180,
+			sorter: true,
+			render: (date: string) => (
+				<Text type="secondary">
+					{new Date(date).toLocaleString('zh-TW', {
+						year: 'numeric',
+						month: '2-digit',
+						day: '2-digit',
+						hour: '2-digit',
+						minute: '2-digit',
+					})}
+				</Text>
+			),
+		},
+		{
+			title: '操作',
+			key: 'actions',
+			fixed: 'right',
+			width: 150,
+			render: (_, record) => (
+				<WebsiteActionButtons
+					record={record}
+					onStart={handleStart}
+					onStop={handleStop}
+					onDelete={handleDelete}
+					onChangeDomain={handleShowChangeDomainModal}
+				/>
+			),
+		},
+	]
+
 	if (isLoading) {
 		return (
 			<div style={{ textAlign: 'center', padding: '60px 0' }}>
@@ -510,53 +519,86 @@ const PowercloudContent = () => {
 		)
 	}
 
-	if (!websites.length) {
-		return (
-			<Empty description="尚無網站資料" style={{ padding: '60px 0' }}>
-				<Text type="secondary">請前往「手動開站」建立您的第一個網站</Text>
-			</Empty>
-		)
-	}
-
 	return (
-		<div>
-			<div
-				style={{
-					marginBottom: 16,
-					display: 'flex',
-					justifyContent: 'space-between',
-					alignItems: 'center',
-				}}
-			>
-				<Text type="secondary">共 {total || 0} 個網站</Text>
+		<div className="space-y-4">
+			<div className="flex justify-end">
 				<Button
-					icon={<ReloadOutlined spin={isFetching} />}
-					onClick={() => refetch()}
-					loading={isFetching}
+					type="primary"
+					icon={<PlusOutlined />}
+					onClick={() => setTab(TabKeyEnum.MANUAL_SITE_SYNC)}
 				>
-					重新整理
+					新增網站
 				</Button>
 			</div>
-			<Table
-				columns={columns}
-				dataSource={websites}
-				rowKey="id"
-				loading={isFetching}
-				scroll={{ x: 1000 }}
-				pagination={{
-					current: pagination.page,
-					pageSize: pagination.limit,
-					total,
-					showSizeChanger: true,
-					showQuickJumper: true,
-					pageSizeOptions: ['10', '20', '50'],
-					showTotal: (total, range) =>
-						`第 ${range[0]}-${range[1]} 筆，共 ${total} 筆`,
-					onChange: (page, pageSize) => {
-						setPagination({ page, limit: pageSize })
-					},
-				}}
-			/>
+			{/* <ContentCard>
+				<WebsiteListFilter onSearch={handleSearch} />
+			</ContentCard> */}
+
+			{isError && (
+				<Alert
+					message="載入網站列表失敗"
+					description={
+						(error as any)?.response?.data?.message ||
+						(error as Error)?.message ||
+						'請稍後再試'
+					}
+					type="error"
+					showIcon
+					closable
+					className="mb-4"
+				/>
+			)}
+
+			{!websites.length && !hasSearched && !isError ? (
+				<ContentCard>
+					<div style={{ padding: '60px 0', textAlign: 'center' }}>
+						<Text type="secondary">尚無網站資料，請前往「手動開站」建立您的第一個網站</Text>
+					</div>
+				</ContentCard>
+			) : (
+				<ContentCard>
+					<div
+						style={{
+							marginBottom: 16,
+							display: 'flex',
+							justifyContent: 'space-between',
+							alignItems: 'center',
+						}}
+					>
+						<Text type="secondary">共 {total || 0} 個網站</Text>
+						<Button
+							icon={<ReloadOutlined spin={isFetching} />}
+							onClick={() => {
+								refetch()
+								refetchApps()
+							}}
+							loading={isFetching}
+						>
+							重新整理
+						</Button>
+					</div>
+					<Table
+						columns={columns}
+						dataSource={websites}
+						rowKey="id"
+						loading={isFetching}
+						scroll={{ x: 'max-content' }}
+						pagination={{
+							current: pagination.page,
+							pageSize: pagination.limit,
+							total,
+							showSizeChanger: true,
+							showQuickJumper: true,
+							pageSizeOptions: ['10', '20', '50'],
+							showTotal: (total, range) =>
+								`顯示 ${range[0]}-${range[1]} 共 ${total} 筆記錄`,
+							onChange: (page, pageSize) => {
+								setPagination({ page, limit: pageSize })
+							},
+						}}
+					/>
+				</ContentCard>
+			)}
 
 			<Modal
 				title="變更域名 (Domain Name)"

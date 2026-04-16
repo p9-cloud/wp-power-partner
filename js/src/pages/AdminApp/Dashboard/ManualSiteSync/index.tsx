@@ -3,6 +3,7 @@ import {
 	GlobalOutlined,
 	LoadingOutlined,
 } from '@ant-design/icons'
+import ContentCard from '@/components/ContentCard'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import {
 	Button,
@@ -64,6 +65,14 @@ interface IPowercloudPackage {
 	createdAt: string
 	deletedAt: string | null
 	updatedAt: string
+}
+
+interface IPowercloudTemplate {
+	id: string
+	primaryDomain: string
+	domain?: string
+	subDomain?: string
+	wildcardDomain: string
 }
 
 // 選中的方案 Atom
@@ -220,6 +229,7 @@ type TPowercloudOpenSiteParams = {
 		}
 	}
 	ip?: string
+	templateUrl?: string
 }
 
 const PowercloudOpenSite = () => {
@@ -242,6 +252,23 @@ const PowercloudOpenSite = () => {
 
 	const websitePackages: IPowercloudPackage[] =
 		(packagesData?.data?.data as IPowercloudPackage[]) || []
+
+	// 取得模板列表
+	const { data: templatesData, isLoading: isLoadingTemplates } = useQuery({
+		queryKey: ['powercloud-template-list'],
+		queryFn: () =>
+			powerCloudInstance.get('/templates/wordpress?page=1&limit=250'),
+	})
+
+	const websiteTemplates: IPowercloudTemplate[] =
+		(templatesData?.data?.data as IPowercloudTemplate[]) || []
+
+	const getDomain = (template: IPowercloudTemplate): string =>
+		template.primaryDomain ||
+		template.domain ||
+		template.subDomain ||
+		template.wildcardDomain ||
+		''
 
 	// 當選中的方案改變時，自動設置表單值
 	useEffect(() => {
@@ -322,7 +349,15 @@ const PowercloudOpenSite = () => {
 				// 生成隨機配置（只調用一次）
 				const wpsiteConfig = generateRandomWpsiteProConfig()
 
-				const { adminEmail, ...data } = values
+				const { adminEmail, templateId, ...data } = values
+
+				// 解析模板 URL
+				const selectedTemplate = templateId
+					? websiteTemplates.find((tpl) => tpl.id === templateId)
+					: undefined
+				const templateUrl = selectedTemplate
+					? getDomain(selectedTemplate)
+					: undefined
 
 				createWordPress({
 					...data,
@@ -342,6 +377,7 @@ const PowercloudOpenSite = () => {
 							password: handleGenerateRandomPassword('mysql'),
 						},
 					},
+					...(templateUrl ? { templateUrl } : {}),
 				})
 			})
 			.catch((error) => {
@@ -365,12 +401,35 @@ const PowercloudOpenSite = () => {
 					rules={[{ required: true, message: '請選擇方案' }]}
 				>
 					<Select
-						placeholder="選擇方案"
 						loading={isLoadingPackages}
 						options={websitePackages.map((pkg) => ({
 							label: `${pkg.name} - NT$ ${pkg.price}`,
 							value: pkg.id,
 						}))}
+						disabled={isPending}
+						getPopupContainer={() => containerRef.current as HTMLElement}
+					/>
+				</Form.Item>
+
+				<Form.Item
+					label="網站模板"
+					name={['templateId']}
+					help="如不選擇，會開空白的 WordPress 站台"
+				>
+					<Select
+						loading={isLoadingTemplates}
+						options={websiteTemplates.map((tpl) => ({
+							label: getDomain(tpl),
+							value: tpl.id,
+						}))}
+						allowClear
+						showSearch
+						filterOption={(input, option) =>
+							(option?.label ?? '')
+								.toString()
+								.toLowerCase()
+								.includes(input.toLowerCase())
+						}
 						disabled={isPending}
 						getPopupContainer={() => containerRef.current as HTMLElement}
 					/>
@@ -665,7 +724,11 @@ const siteTypeItems: TabsProps['items'] = [
 ]
 
 const index = () => {
-	return <Tabs items={siteTypeItems} />
+	return (
+		<ContentCard>
+			<Tabs items={siteTypeItems} />
+		</ContentCard>
+	)
 }
 
 export default index
